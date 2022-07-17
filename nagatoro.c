@@ -90,16 +90,24 @@ int main(int argc, char **argv)
 {
     static struct pattern patternArray[300] = {0};
     uintptr_t patternCount = 0;
-    outFile  = stdout;
+    static bool merge = false;
+
+    outFile = stdout;
 
     int c = 0;
 
-    while ((c = getopt(argc, argv, "p:o:S:")) != -1)
+    while ((c = getopt(argc, argv, "p:o:S:m")) != -1)
     switch (c)
     {
     case 'p': pattern = optarg; break;
-    case 'o': outFile = fopen(optarg, "w");
-    case 'S': stopWord = optarg;
+    case 'm': merge = true; break;
+    case 'o':
+        if (merge)
+            outFile = fopen(optarg, "a"); 
+        else 
+            outFile = fopen(optarg, "w");
+        break;
+    case 'S': stopWord = optarg; break;
     }
 
     char *solverPattern = pattern;
@@ -134,3 +142,5 @@ int main(int argc, char **argv)
         fclose(outFile);
 
 }
+
+
