@@ -5,68 +5,78 @@
 #include <stdint.h>
 #include <ctype.h>
 
+#include <string.h>
+
 #include <assert.h>
 
 static char *pattern = "%%";
 
 FILE *outFile = NULL;
 
+char *stopWord = NULL;
+static bool stop = false;
+
 struct pattern
 {
     char value;
     bool isPattern;
+    struct parent *parent;
 };
 
-void produce(struct pattern *patternList, uintptr_t patternCount)
+void produce(struct pattern *patternArray, uintptr_t patternCount)
 {
     char strbuffer[30] = {0};
     char *bufferptr = strbuffer;
 
     for (uintptr_t index = 0; index < patternCount; index++)
-        *bufferptr++ = patternList[index].value;
+        *bufferptr++ = patternArray[index].value;
+
+    if (stopWord)
+        if(strncmp(strbuffer, stopWord, sizeof(strbuffer)) == 0)
+            stop = true;
     
     fprintf(outFile, "%s\n", strbuffer);
 }
 
-bool inctoend(struct pattern *patternList, uintptr_t patternCount)
-{    
+bool inctoend(struct pattern *patternArray, const uintptr_t patternCount)
+{
     bool inc = false;
+    struct pattern *parent = NULL;
 
     uintptr_t index = patternCount;
 
-    uintptr_t lastEndIndex = 0;
-
-    for (; index > 0 && inc == false; index--)
+    for (; index > 0 && inc == false; )
     {
-        struct pattern *patt = &patternList[index - 1];
+        struct pattern *patt = patternArray + --index;
         if (patt->isPattern != true)
             continue;
         
         char value = patt->value;
 
-        if (isdigit(value) != 0)
+        if (value >= '0' && value <= '9')
         {
-            if (value == '9') { lastEndIndex = index - 1; continue; }
+            if (value == '9') { parent = patt; continue; }
             value++;
         }
         else
         {
             if (value == 'Z') value = '`';
-            if (value == 'z') { lastEndIndex = index - 1; continue; }
+            if (value == 'z') { parent = patt; continue; }
             
             value++;
         }
 
-        if (lastEndIndex != 0)
+        if (parent != NULL)
         {
-            struct pattern *last = &patternList[lastEndIndex];
-
-            if (last->isPattern == true)
+            for (; parent != (patternArray + patternCount); parent++)
             {
-                if (last->value == '9')
-                    last->value = '0';
-                else if (last->value == 'z')
-                    last->value = 'A';
+                if (parent->isPattern == true)
+                {
+                    if (parent->value == '9')
+                        parent->value = '0';
+                    else if (parent->value == 'z')
+                        parent->value = 'A';
+                }
             }
         }
 
@@ -84,11 +94,12 @@ int main(int argc, char **argv)
 
     int c = 0;
 
-    while ((c = getopt(argc, argv, "p:o:")) != -1)
+    while ((c = getopt(argc, argv, "p:o:S:")) != -1)
     switch (c)
     {
     case 'p': pattern = optarg; break;
     case 'o': outFile = fopen(optarg, "w");
+    case 'S': stopWord = optarg;
     }
 
     char *solverPattern = pattern;
@@ -112,8 +123,12 @@ int main(int argc, char **argv)
 
     }
 
-    while (inctoend(patternArray, patternCount)) 
+    produce(patternArray, patternCount);
+
+    for (; inctoend(patternArray, patternCount) && (stop == false); )
         produce(patternArray, patternCount);
+
+    fflush(outFile);
 
     if (outFile != stdout)
         fclose(outFile);
